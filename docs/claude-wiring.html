@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>COMP 440 Retrieval Wiring</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: swim-lane UML canvas (people → model → instructions → tools → code → data), SVG connectors drawn over it, flows replay paths */
+:root {
+  --bg: #eef2f4; --paper: #fbfcfd; --ink: #16222b; --muted: #5a6b77; --rule: #c9d3da;
+  --accent: #2b5fd9;
+  --ok: #12925a; --ok-soft: #dff5ea; --ok-glow: rgba(18,146,90,.45);
+  --park: #b7791f; --park-soft: #fbf0dc;
+  --pend: #5f7d95; --pend-soft: #e8eef3;
+  --off: #8a96a0; --off-soft: #f0f2f4;
+  --edge: #9fb0bd;
+  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body: "Atkinson Hyperlegible", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f1519; --paper: #172027; --ink: #e3eaef; --muted: #93a3ae; --rule: #2c3a44;
+  --accent: #7aa2ff;
+  --ok: #3fd18b; --ok-soft: #12301f; --ok-glow: rgba(63,209,139,.4);
+  --park: #e3a948; --park-soft: #33270f;
+  --pend: #8fb0c8; --pend-soft: #1c2a35;
+  --off: #6f7c86; --off-soft: #1a2228;
+  --edge: #4a5c69; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f1519; --paper: #172027; --ink: #e3eaef; --muted: #93a3ae; --rule: #2c3a44;
+  --accent: #7aa2ff;
+  --ok: #3fd18b; --ok-soft: #12301f; --ok-glow: rgba(63,209,139,.4);
+  --park: #e3a948; --park-soft: #33270f;
+  --pend: #8fb0c8; --pend-soft: #1c2a35;
+  --off: #6f7c86; --off-soft: #1a2228;
+  --edge: #4a5c69; color-scheme: dark }
+
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--body); }
+.wrap { max-width: 1340px; margin: 0 auto; padding-block: 28px 56px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header { display: grid; gap: 8px; max-width: 72ch; }
+.eyebrow { font: 600 12px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font: 700 clamp(28px, 4vw, 42px)/1.1 var(--display); margin: 0; text-wrap: balance; }
+h2 { font: 700 22px/1.2 var(--display); margin: 0 0 12px; text-wrap: balance; }
+header p { margin: 0; color: var(--muted); }
+
+.legend { display: flex; flex-wrap: wrap; gap: 10px 22px; margin: 20px 0 14px; font-size: 13.5px; }
+.legend span { display: inline-flex; align-items: center; gap: 8px; }
+.sw { width: 18px; height: 12px; border-radius: 3px; border: 2px solid; }
+.sw.ok { border-color: var(--ok); background: var(--ok-soft); box-shadow: 0 0 8px var(--ok-glow); }
+.sw.park { border-color: var(--park); background: var(--park-soft); }
+.sw.pend { border-color: var(--pend); background: var(--pend-soft); }
+.sw.off { border-color: var(--off); border-style: dashed; background: var(--off-soft); }
+
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+.controls .lbl { font: 600 12px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-right: 4px; }
+button.flow { font: 600 13px var(--body); color: var(--ink); background: var(--paper); border: 1px solid var(--rule);
+  border-radius: 999px; padding: 6px 13px; cursor: pointer; }
+button.flow:hover { border-color: var(--accent); }
+button.flow[aria-pressed="true"] { background: var(--accent); color: var(--paper); border-color: var(--accent); }
+button:focus-visible, .cls:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.narr { min-height: 3em; margin: 6px 0 12px; padding: 10px 14px; background: var(--paper); border: 1px solid var(--rule);
+  border-radius: 8px; font-size: 14px; max-width: 100ch; }
+.narr b { font-family: var(--mono); font-size: 12.5px; color: var(--accent); }
+
+.scroller { overflow-x: auto; border: 1px solid var(--rule); border-radius: 10px; background:
+  radial-gradient(circle, var(--rule) 1px, transparent 1.2px) 0 0 / 22px 22px, var(--bg); }
+.canvas { position: relative; width: 1300px; padding: 18px 18px 26px; }
+svg.edges { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; overflow: visible; }
+.lane { position: relative; z-index: 1; display: grid; grid-template-columns: 112px 1fr; gap: 14px; align-items: start; margin-bottom: 46px; }
+.lane:last-child { margin-bottom: 0; }
+.lane-name { font: 600 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
+  padding-top: 10px; border-top: 2px solid var(--rule); }
+.row { display: flex; gap: 22px; align-items: flex-start; flex-wrap: nowrap; }
+
+/* UML class box */
+.cls { position: relative; background: var(--paper); border: 2px solid var(--rule); border-radius: 6px; min-width: 150px;
+  font-size: 12.5px; cursor: pointer; transition: opacity .2s, box-shadow .2s, transform .2s; }
+.cls .st { font: 600 10px var(--mono); letter-spacing: .06em; text-transform: uppercase; padding: 3px 8px 0; }
+.cls .nm { padding: 2px 10px 6px; border-bottom: 1px solid var(--rule); }
+.cls .nm .stereo { display: block; font: 400 11px var(--mono); color: var(--muted); }
+.cls .nm strong { font: 700 15px var(--display); }
+.cls ul { list-style: none; margin: 0; padding: 6px 10px; font: 400 11.5px/1.55 var(--mono); }
+.cls ul + ul { border-top: 1px solid var(--rule); }
+.cls ul li { white-space: nowrap; }
+.cls ul li i { font-style: normal; color: var(--muted); }
+.cls[data-s="ok"] { border-color: var(--ok); box-shadow: 0 0 0 0 var(--ok-glow); animation: glow 3.2s ease-in-out infinite; }
+.cls[data-s="ok"] .st { color: var(--ok); }
+.cls[data-s="park"] { border-color: var(--park); background: linear-gradient(var(--park-soft), var(--park-soft)) top/100% 22px no-repeat, var(--paper); }
+.cls[data-s="park"] .st { color: var(--park); }
+.cls[data-s="pend"] { border-color: var(--pend); }
+.cls[data-s="pend"] .st { color: var(--pend); }
+.cls[data-s="off"] { border-style: dashed; border-color: var(--off); background: var(--off-soft); color: var(--muted); }
+.cls[data-s="off"] .st { color: var(--off); }
+@keyframes glow { 0%,100% { box-shadow: 0 0 0 0 var(--ok-glow); } 50% { box-shadow: 0 0 14px 2px var(--ok-glow); } }
+
+/* sparkles on working parts */
+.spk { position: absolute; width: 12px; height: 12px; pointer-events: none; color: var(--ok); animation: twinkle 2.4s ease-in-out infinite; }
+.spk svg { width: 100%; height: 100%; display: block; fill: currentColor; }
+.spk.a { top: -7px; right: -6px; } .spk.b { bottom: -6px; left: -6px; animation-delay: .8s; width: 9px; height: 9px; }
+.spk.c { top: 40%; right: -8px; animation-delay: 1.6s; width: 8px; height: 8px; }
+@keyframes twinkle { 0%,100% { opacity: .15; transform: scale(.5) rotate(0); } 45% { opacity: 1; transform: scale(1.15) rotate(25deg); } }
+
+.dim .cls:not(.hot) { opacity: .28; }
+.cls.hot { transform: translateY(-2px); }
+.cls.hot:not([data-s="ok"]) { box-shadow: 0 0 0 3px var(--accent); }
+
+path.e { fill: none; stroke: var(--edge); stroke-width: 1.4; transition: opacity .2s; }
+path.e.off { stroke-dasharray: 3 4; }
+path.e.hot { stroke: var(--accent); stroke-width: 2.4; stroke-dasharray: 7 5; animation: run 0.8s linear infinite; }
+path.e.hot.okp { stroke: var(--ok); }
+.dim path.e:not(.hot) { opacity: .12; }
+@keyframes run { to { stroke-dashoffset: -12; } }
+.elabel { font: 600 10.5px var(--mono); fill: var(--ink); paint-order: stroke; stroke: var(--bg); stroke-width: 4px; stroke-linejoin: round; }
+marker path { fill: var(--edge); }
+#arrHot path { fill: var(--accent); } #arrOk path { fill: var(--ok); }
+
+.below { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 22px; margin-top: 34px; }
+.below section { min-width: 0; }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font: 600 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+td code, p code, li code { font: 12.5px var(--mono); }
+.tbl { overflow-x: auto; }
+.pill { display: inline-block; font: 600 10.5px var(--mono); padding: 1px 7px; border-radius: 999px; border: 1.5px solid; white-space: nowrap; }
+.pill.ok { color: var(--ok); border-color: var(--ok); background: var(--ok-soft); }
+.pill.park { color: var(--park); border-color: var(--park); background: var(--park-soft); }
+.pill.pend { color: var(--pend); border-color: var(--pend); background: var(--pend-soft); }
+.pill.off { color: var(--off); border-color: var(--off); border-style: dashed; }
+.note { color: var(--muted); font-size: 13.5px; }
+ol.fix { padding-left: 20px; margin: 0; display: grid; gap: 6px; font-size: 14px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cls[data-s="ok"], .spk, path.e.hot { animation: none; }
+  .spk { opacity: .8; }
+}
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">COMP 440 · Representing and Retrieving Knowledge · checked 6 Nov 2026</div>
+  <h1>How Claude reaches the model, skills, tools and data in this activity</h1>
+  <p>A class diagram of the retrieval activity in <code>comp440-reimagine/</code>. Each box is a part Claude touches. The color shows what is working in this folder right now. Click a box to see what it connects to, or pick a flow to replay it step by step.</p>
+</header>
+
+<div class="legend" aria-label="Legend">
+  <span><i class="sw ok"></i>Working: present and checked</span>
+  <span><i class="sw park"></i>Parked: on disk but not loaded</span>
+  <span><i class="sw pend"></i>Not yet: created as the student works</span>
+  <span><i class="sw off"></i>Not used by this activity</span>
+</div>
+
+<div class="controls" role="group" aria-label="Flows">
+  <span class="lbl">Replay a flow</span>
+  <button class="flow" id="f-all" aria-pressed="true">Show everything</button>
+  <button class="flow" id="f-start">Session start</button>
+  <button class="flow" id="f-setup">setup skill (Part 0)</button>
+  <button class="flow" id="f-search">A search (Part 3)</button>
+  <button class="flow" id="f-embed">Embeddings run (Part 5)</button>
+  <button class="flow" id="f-commit">Part N done commit</button>
+</div>
+<div class="narr" id="narr" aria-live="polite">Showing every connection. Pick a flow to follow one path through the system.</div>
+
+<div class="scroller">
+<div class="canvas" id="canvas">
+<svg class="edges" id="edges" aria-hidden="true">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="arrHot" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="arrOk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+</svg>
+
+<div class="lane"><div class="lane-name">People &amp; model</div><div class="row">
+  <div class="cls" data-s="ok" id="student" tabindex="0">
+    <div class="st">Working</div>
+    <div class="nm"><span class="stereo">«actor»</span><strong>Student</strong></div>
+    <ul><li>predictions <i>: Part 0</i></li><li>tfidf choices <i>: Part 1</i></li><li>questions <i>: Part 3</i></li></ul>
+    <ul><li>types in terminal()</li><li>/save</li></ul>
+  </div>
+  <div class="cls" data-s="ok" id="harness" tabindex="0" style="margin-left:40px">
+    <div class="st">Working</div>
+    <div class="nm"><span class="stereo">«runtime»</span><strong>Claude Code harness</strong></div>
+    <ul><li>permission mode <i>: auto</i></li><li>context <i>: CLAUDE.md + skill list</i></li><li>cwd <i>: comp440-reimagine/</i></li></ul>
+    <ul><li>loadInstructions()</li><li>runHooks(event)</li><li>runTool(call) → result</li><li>connectMCP() <i>// none here</i></li></ul>
+  </div>
+  <div class="cls" data-s="ok" id="llm" tabindex="0" style="margin-left:40px">
+    <div class="st">Working</div>
+    <div class="nm"><span class="stereo">«LLM»</span><strong>Claude Opus 5.5</strong></div>
+    <ul><li>model id <i>: claude-opus-5-5</i></li><li>role <i>: tutor &amp; lab assistant</i></li></ul>
+    <ul><li>read(context) → plan</li><li>callTool(name, input)</li><li>reply(≤150 words)</li></ul>
+  </div>
+</div></div>
+
+<div class="lane"><div class="lane-name">Instructions</div><div class="row">
+  <div class="cls" data-s="ok" id="claudemd" tabindex="0">
+    <div class="st">Working · loaded from parent folder</div>
+    <div class="nm"><span class="stereo">«rules»</span><strong>CLAUDE.md</strong></div>
+    <ul><li>start of session <i>: git log</i></li><li>run gate <i>: until Part 0 done</i></li><li>Parts 0–5 steps</li><li>writing rules <i>: their words</i></li></ul>
+    <ul><li>currentPart() from commits</li><li>fillSlot(answer)</li></ul>
+  </div>
+  <div class="cls" data-s="park" id="settings" tabindex="0">
+    <div class="st">Parked · .claude.old/</div>
+    <div class="nm"><span class="stereo">«config»</span><strong>settings.json</strong></div>
+    <ul><li>allow <i>: 22 rules</i></li><li>SessionStart hook</li><li>PreToolUse hook <i>: Bash</i></li></ul>
+    <ul><li>allow(git, uv run …)</li><li>onBash(cmd) → guard.py</li></ul>
+  </div>
+  <div class="cls" data-s="park" id="skills" tabindex="0">
+    <div class="st">Parked · .claude.old/skills/</div>
+    <div class="nm"><span class="stereo">«skills»</span><strong>Activity skills</strong></div>
+    <ul><li>setup <i>: Part 0</i></li><li>save <i>: /save, end of class</i></li><li>checkpoint <i>: after Part 5</i></li></ul>
+    <ul><li>setup.run()</li><li>save.run()</li><li>checkpoint.run()</li></ul>
+  </div>
+  <div class="cls" data-s="off" id="mcp" tabindex="0">
+    <div class="st">Not used</div>
+    <div class="nm"><span class="stereo">«MCP»</span><strong>MCP servers</strong></div>
+    <ul><li>.mcp.json <i>: none</i></li><li>activity servers <i>: 0</i></li></ul>
+    <ul><li>listTools()</li><li>callTool()</li></ul>
+  </div>
+</div></div>
+
+<div class="lane"><div class="lane-name">Tools</div><div class="row">
+  <div class="cls" data-s="ok" id="bash" tabindex="0">
+    <div class="st">Working</div>
+    <div class="nm"><span class="stereo">«tool»</span><strong>Bash</strong></div>
+    <ul><li>git log / add / commit / push</li><li>uv sync</li><li>uv run python &lt;script&gt;</li><li>python3 dump_transcript.py</li></ul>
+  </div>
+  <div class="cls" data-s="ok" id="read" tabindex="0">
+    <div class="st">Working</div>
+    <div class="nm"><span class="stereo">«tool»</span><strong>Read</strong></div>
+    <ul><li>WRITEUP.md <i>// every session</i></li><li>tfidf_settings.py</li><li>job output files</li></ul>
+  </div>
+  <div class="cls" data-s="ok" id="edit" tabindex="0">
+    <div class="st">Working</div>
+    <div class="nm"><span class="stereo">«tool»</span><strong>Edit</strong></div>
+    <ul><li>WRITEUP.md <i>// slots</i></li><li>tfidf_settings.py <i>// Part 1</i></li></ul>
+  </div>
+  <div class="cls" data-s="ok" id="skilltool" tabindex="0">
+    <div class="st">Working</div>
+    <div class="nm"><span class="stereo">«tool»</span><strong>Skill</strong></div>
+    <ul><li>loads a SKILL.md into the turn</li><li>finds: setup, save, checkpoint <i>// not now</i></li></ul>
+  </div>
+  <div class="cls" data-s="park" id="guard" tabindex="0">
+    <div class="st">Parked · hook not loaded</div>
+    <div class="nm"><span class="stereo">«hook script»</span><strong>guard.py</strong></div>
+    <ul><li>SCRIPTS <i>: top_terms|search|evaluate|site</i></li><li>PART_DONE <i>: "Part N done"</i></li></ul>
+    <ul><li>main() → exit 0 | 2</li><li>stop(lines)</li></ul>
+  </div>
+</div></div>
+
+<div class="lane"><div class="lane-name">Activity code</div><div class="row">
+  <div class="cls" data-s="ok" id="scripts" tabindex="0">
+    <div class="st">Working · installed, not run</div>
+    <div class="nm"><span class="stereo">«entry points»</span><strong>Student commands</strong></div>
+    <ul><li>top_terms.py "&lt;title&gt;"</li><li>search.py '&lt;q&gt;' --method</li><li>evaluate.py --method | --show</li><li>site.py :8765</li></ul>
+  </div>
+  <div class="cls" data-s="ok" id="retrieval" tabindex="0">
+    <div class="st">Working</div>
+    <div class="nm"><span class="stereo">«module»</span><strong>retrieval.py</strong></div>
+    <ul><li>TOP = 10 · DEPTH = 100</li><li>MODEL <i>: all-MiniLM-L6-v2</i></li></ul>
+    <ul><li><b>TfidfSearch</b>.scores() · matched() · ignored()</li><li><b>EmbedSearch</b>.scores() · cut_off()</li><li>search(method, questions)</li><li>load_movies() · load_questions()</li><li>tfidf_settings() · load_model()</li></ul>
+  </div>
+  <div class="cls" data-s="ok" id="settingsfile" tabindex="0">
+    <div class="st">Working · scikit-learn defaults</div>
+    <div class="nm"><span class="stereo">«student choices»</span><strong>tfidf_settings.py</strong></div>
+    <ul><li>REMOVE_STOP_WORDS <i>= False</i></li><li>MIN_MOVIES <i>= 1</i></li><li>REPEATS_COUNT_LESS <i>= False</i></li></ul>
+  </div>
+  <div class="cls" data-s="ok" id="download" tabindex="0">
+    <div class="st">Working</div>
+    <div class="nm"><span class="stereo">«setup script»</span><strong>download_model.py</strong></div>
+    <ul><li>main() → checks 5 test movies</li></ul>
+  </div>
+  <div class="cls" data-s="ok" id="checks" tabindex="0">
+    <div class="st">Working</div>
+    <div class="nm"><span class="stereo">«stdlib scripts»</span><strong>run_all · dump_transcript</strong></div>
+    <ul><li>blank_slots() · subjects()</li><li>check_order() · check_saved()</li><li>render_session() · auto_commit()</li></ul>
+  </div>
+</div></div>
+
+<div class="lane"><div class="lane-name">Data &amp; outputs</div><div class="row">
+  <div class="cls" data-s="ok" id="movies" tabindex="0">
+    <div class="st">Working</div>
+    <div class="nm"><span class="stereo">«data»</span><strong>movies.jsonl</strong></div>
+    <ul><li>4,309 plot summaries</li></ul>
+  </div>
+  <div class="cls" data-s="ok" id="questions" tabindex="0">
+    <div class="st">Working</div>
+    <div class="nm"><span class="stereo">«data»</span><strong>questions.jsonl</strong></div>
+    <ul><li>518 · detail / reworded / vague / real</li></ul>
+  </div>
+  <div class="cls" data-s="ok" id="vectors" tabindex="0">
+    <div class="st">Working</div>
+    <div class="nm"><span class="stereo">«data»</span><strong>embeddings.npz</strong></div>
+    <ul><li>shipped summary vectors</li></ul>
+  </div>
+  <div class="cls" data-s="ok" id="model" tabindex="0">
+    <div class="st">Working · downloaded</div>
+    <div class="nm"><span class="stereo">«model files»</span><strong>.model/</strong></div>
+    <ul><li>fastembed 0.9 · onnxruntime 1.23</li></ul>
+  </div>
+  <div class="cls" data-s="pend" id="results" tabindex="0">
+    <div class="st">Not yet</div>
+    <div class="nm"><span class="stereo">«output»</span><strong>results/</strong></div>
+    <ul><li>tfidf.json · embed.json</li></ul>
+  </div>
+  <div class="cls" data-s="pend" id="writeup" tabindex="0">
+    <div class="st">Not yet · 14 slots XXXX</div>
+    <div class="nm"><span class="stereo">«hand-in»</span><strong>WRITEUP.md</strong></div>
+    <ul><li>Name · Date · Parts 0–5</li></ul>
+  </div>
+  <div class="cls" data-s="ok" id="github" tabindex="0">
+    <div class="st">Working · origin set</div>
+    <div class="nm"><span class="stereo">«remote»</span><strong>GitHub fork</strong></div>
+    <ul><li>origin <i>: cluno113/…</i></li><li>upstream <i>: not added</i></li></ul>
+  </div>
+</div></div>
+
+</div>
+</div>
+
+<div class="below">
+<section>
+  <h2>The three skills and what each one calls</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Skill</th><th>When</th><th>Functions and commands, in order</th></tr></thead>
+    <tbody>
+      <tr><td><code>setup</code><br><span class="pill park">parked</span></td><td>First session, Part 0</td>
+        <td><code>git remote -v</code> → <code>uv --version</code> → background <code>uv sync &amp;&amp; download_model.py</code> → Edit Name/Date → <code>dump_transcript.py</code> → commit <em>Name and date</em> → ask 2 predictions → commit <em>Part 0 done</em></td></tr>
+      <tr><td><code>save</code><br><span class="pill park">parked</span></td><td><code>/save</code>, or class is ending</td>
+        <td>write any pending answer → <code>dump_transcript.py</code> → stage by name → commit <em>Save work in progress</em> → <code>git push</code> → say where they stopped</td></tr>
+      <tr><td><code>checkpoint</code><br><span class="pill park">parked</span></td><td>After <em>Part 5 done</em></td>
+        <td><code>run_all.py</code> → name blank slots → <code>dump_transcript.py</code> → commit and push → Work Submission Form → after submit, the finish line</td></tr>
+    </tbody>
+  </table></div>
+</section>
+<section>
+  <h2>What is not lit up, and how to turn it on</h2>
+  <ol class="fix">
+    <li><span class="pill park">parked</span> Skills, permissions and both hooks live in <code>.claude.old/</code>. Commit 569a7ae, <em>Turn off the tutor rules</em>, renamed it. Renaming it back to <code>.claude/</code> loads them in the next session.</li>
+    <li><span class="pill park">parked</span> <code>guard.py</code> only runs through the PreToolUse hook. Until that loads, nothing enforces the run gate. Only the written rule in <code>CLAUDE.md</code> holds it.</li>
+    <li><span class="pill ok">working</span> <code>CLAUDE.md</code> is active because the parent folder <code>comp440-reimagine/</code> holds an identical copy. Inside this repo it is <code>CLAUDE.md.old</code>.</li>
+    <li><span class="pill off">not used</span> No MCP server is part of this activity. Claude reaches everything through the built-in Bash, Read, Edit and Skill tools.</li>
+    <li><span class="pill pend">not yet</span> <code>results/</code> and the 14 <code>XXXX</code> slots fill in as a student works through Parts 0–5.</li>
+  </ol>
+</section>
+</div>
+</div>
+
+<script>
+const SPARK = '<svg viewBox="0 0 24 24"><path d="M12 0c.6 6.5 5.5 11.4 12 12-6.5.6-11.4 5.5-12 12-.6-6.5-5.5-11.4-12-12C6.5 11.4 11.4 6.5 12 0z"/></svg>';
+document.querySelectorAll('.cls[data-s="ok"]').forEach(el => {
+  ['a','b','c'].forEach(k => { const s = document.createElement('span'); s.className = 'spk ' + k; s.innerHTML = SPARK; el.appendChild(s); });
+});
+
+// [from, to, label, edgeStatus]
+const E = [
+  ['student','harness','types a message','ok'],
+  ['harness','llm','prompt + context','ok'],
+  ['llm','harness','tool calls','ok'],
+  ['harness','claudemd','loads rules','ok'],
+  ['harness','settings','loads allow + hooks','park'],
+  ['harness','skills','lists skills','park'],
+  ['harness','mcp','connects','off'],
+  ['llm','bash','calls','ok'],
+  ['llm','read','calls','ok'],
+  ['llm','edit','calls','ok'],
+  ['llm','skilltool','calls','ok'],
+  ['skilltool','skills','loads SKILL.md','park'],
+  ['settings','guard','PreToolUse','park'],
+  ['guard','bash','exit 0 | 2','park'],
+  ['guard','checks','blank_slots()','park'],
+  ['bash','scripts','uv run python','ok'],
+  ['bash','download','uv sync &&','ok'],
+  ['bash','checks','python3','ok'],
+  ['bash','github','git push','ok'],
+  ['scripts','retrieval','import','ok'],
+  ['download','retrieval','load_model()','ok'],
+  ['retrieval','settingsfile','runpy','ok'],
+  ['retrieval','movies','load_movies()','ok'],
+  ['retrieval','questions','load_questions()','ok'],
+  ['retrieval','vectors','shipped_vectors()','ok'],
+  ['retrieval','model','fastembed','ok'],
+  ['download','model','downloads','ok'],
+  ['scripts','results','evaluate writes','pend'],
+  ['edit','writeup','fills slots','pend'],
+  ['edit','settingsfile','Part 1 values','ok'],
+  ['read','writeup','reads all','pend'],
+  ['checks','writeup','reads slots','pend'],
+];
+
+const FLOWS = {
+  start: { nodes: ['student','harness','claudemd','settings','skills','mcp','llm','bash','read','writeup','github'],
+    edges: [[0],[3],[4],[5],[6],[1],[7],[8],[30],[18]],
+    text: '<b>Session start</b> The harness loads <b>CLAUDE.md</b> (working) and would load settings.json and the skill list (parked). No MCP server connects. Claude then runs <b>git log</b> to find the current part and <b>Read</b>s WRITEUP.md in full.' },
+  setup: { nodes: ['llm','skilltool','skills','bash','download','retrieval','model','vectors','edit','writeup','checks','github'],
+    edges: [[10],[11],[7],[16],[20],[26],[24],[9],[28],[17],[18]],
+    text: '<b>setup skill</b> The <b>Skill</b> tool loads setup/SKILL.md. Bash runs <b>uv sync &amp;&amp; download_model.py</b>, which downloads all-MiniLM-L6-v2 into .model/ and checks it against embeddings.npz. Edit fills Name and Date, then the predictions are committed and pushed. Parked now: the Skill tool works, but it has no setup skill to find.' },
+  search: { nodes: ['student','harness','llm','settings','guard','bash','scripts','retrieval','settingsfile','movies'],
+    edges: [[0],[1],[7],[12],[13],[15],[19],[21],[22]],
+    text: '<b>A search</b> The student types a question. Claude calls Bash with <b>uv run python search.py \'…\'</b>. The PreToolUse hook would send it to <b>guard.py</b> first, which stops it before <em>Part 0 done</em>. search.py imports retrieval.py, whose <b>TfidfSearch</b> reads tfidf_settings.py and scores the 4,309 summaries.' },
+  embed: { nodes: ['llm','bash','scripts','retrieval','model','vectors','questions','results'],
+    edges: [[7],[15],[19],[25],[24],[23],[27]],
+    text: '<b>Embeddings run</b> Bash starts <b>evaluate.py --method embed</b> in the background. <b>EmbedSearch</b> embeds all 518 questions with the local model (fastembed + ONNX Runtime), compares them to the shipped summary vectors, and writes results/embed.json for site.py.' },
+  commit: { nodes: ['llm','bash','settings','guard','checks','writeup','github'],
+    edges: [[7],[12],[13],[14],[31],[17],[18]],
+    text: '<b>Part N done</b> Claude runs dump_transcript.py, stages files by name and commits. The hook would pass the commit to <b>guard.py</b>, which calls run_all.blank_slots() and stops it while a Part N slot still reads XXXX. Then <b>git push</b> sends it to the GitHub fork.' },
+};
+
+const canvas = document.getElementById('canvas'), svg = document.getElementById('edges'), narr = document.getElementById('narr');
+const NS = 'http://www.w3.org/2000/svg';
+let focus = null; // {nodes:Set, edges:Set}
+
+function box(id) {
+  const c = canvas.getBoundingClientRect(), r = document.getElementById(id).getBoundingClientRect();
+  return { x: r.left - c.left, y: r.top - c.top, w: r.width, h: r.height };
+}
+function route(a, b) {
+  const A = box(a), B = box(b);
+  const acx = A.x + A.w/2, bcx = B.x + B.w/2;
+  if (B.y > A.y + A.h - 4) {        // target below
+    const x1 = Math.min(Math.max(bcx, A.x + 14), A.x + A.w - 14), y1 = A.y + A.h;
+    const x2 = Math.min(Math.max(acx, B.x + 14), B.x + B.w - 14), y2 = B.y;
+    const dy = (y2 - y1) * .5;
+    return [`M${x1},${y1} C${x1},${y1+dy} ${x2},${y2-dy} ${x2},${y2}`, (x1+x2)/2, (y1+y2)/2];
+  }
+  if (A.y > B.y + B.h - 4) {        // target above
+    const x1 = Math.min(Math.max(bcx, A.x + 14), A.x + A.w - 14), y1 = A.y;
+    const x2 = Math.min(Math.max(acx, B.x + 14), B.x + B.w - 14), y2 = B.y + B.h;
+    const dy = (y1 - y2) * .5;
+    return [`M${x1},${y1} C${x1},${y1-dy} ${x2},${y2+dy} ${x2},${y2}`, (x1+x2)/2, (y1+y2)/2];
+  }
+  // same lane: side to side, offset so the two directions don't overlap
+  const right = B.x > A.x, off = a < b ? -10 : 10;
+  const x1 = right ? A.x + A.w : A.x, x2 = right ? B.x : B.x + B.w;
+  const y1 = A.y + A.h/2 + off, y2 = B.y + B.h/2 + off;
+  const dx = (x2 - x1) * .5;
+  return [`M${x1},${y1} C${x1+dx},${y1} ${x2-dx},${y2} ${x2},${y2}`, (x1+x2)/2, (y1+y2)/2 - 6];
+}
+
+function draw() {
+  [...svg.querySelectorAll('path.e, text')].forEach(n => n.remove());
+  E.forEach(([a, b, label, s], i) => {
+    const [d, mx, my] = route(a, b);
+    const p = document.createElementNS(NS, 'path');
+    const hot = focus && focus.edges.has(i);
+    p.setAttribute('d', d);
+    p.setAttribute('class', 'e' + (s === 'off' || s === 'park' ? ' off' : '') + (hot ? ' hot' : '') + (hot && s === 'ok' ? ' okp' : ''));
+    p.setAttribute('marker-end', hot ? (s === 'ok' ? 'url(#arrOk)' : 'url(#arrHot)') : 'url(#arr)');
+    svg.appendChild(p);
+    if (hot) {
+      const t = document.createElementNS(NS, 'text');
+      t.setAttribute('x', mx); t.setAttribute('y', my); t.setAttribute('text-anchor', 'middle');
+      t.setAttribute('class', 'elabel'); t.textContent = label;
+      svg.appendChild(t);
+    }
+  });
+  document.querySelectorAll('.cls').forEach(el => el.classList.toggle('hot', !!focus && focus.nodes.has(el.id)));
+  canvas.classList.toggle('dim', !!focus);
+}
+
+function setPressed(id) { document.querySelectorAll('button.flow').forEach(b => b.setAttribute('aria-pressed', String(b.id === id))); }
+
+let timer = null;
+function playFlow(key) {
+  clearInterval(timer);
+  const f = FLOWS[key]; setPressed('f-' + key); narr.innerHTML = f.text;
+  const steps = f.edges.map(x => x[0]);
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let n = reduce ? steps.length : 0;
+  const tick = () => {
+    const shown = new Set(steps.slice(0, n));
+    const nodes = new Set(n === steps.length ? f.nodes : []);
+    shown.forEach(i => { nodes.add(E[i][0]); nodes.add(E[i][1]); });
+    focus = { nodes, edges: shown }; draw();
+    if (n >= steps.length) clearInterval(timer); else n++;
+  };
+  tick(); if (!reduce) timer = setInterval(tick, 550);
+}
+function showAll() { clearInterval(timer); focus = null; setPressed('f-all'); narr.textContent = 'Showing every connection. Pick a flow to follow one path through the system.'; draw(); }
+function focusNode(id) {
+  clearInterval(timer); setPressed('');
+  const edges = new Set(), nodes = new Set([id]);
+  E.forEach(([a, b], i) => { if (a === id || b === id) { edges.add(i); nodes.add(a); nodes.add(b); } });
+  focus = { nodes, edges }; draw();
+  const el = document.getElementById(id);
+  narr.innerHTML = `<b>${el.querySelector('strong').textContent}</b> ${el.querySelector('.st').textContent}. Connected to ${nodes.size - 1} part${nodes.size === 2 ? '' : 's'}. Click it again to show everything.`;
+}
+
+document.getElementById('f-all').onclick = showAll;
+Object.keys(FLOWS).forEach(k => document.getElementById('f-' + k).onclick = () => playFlow(k));
+document.querySelectorAll('.cls').forEach(el => {
+  const go = () => (focus && focus.nodes.size && el.classList.contains('hot') && !document.querySelector('button.flow[aria-pressed="true"]')) ? showAll() : focusNode(el.id);
+  el.addEventListener('click', go);
+  el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+});
+addEventListener('resize', draw);
+(document.fonts ? document.fonts.ready : Promise.resolve()).then(draw);
+draw();
+</script>
+
+</html>
